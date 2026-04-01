@@ -29,6 +29,24 @@ from datetime import datetime
 from src.common.db import fetch_all
 from config.settings import DB_PATH
 
+# Initialize database if needed
+def is_db_initialized(db_path):
+    try:
+        conn = sqlite3.connect(str(db_path))
+        cursor = conn.cursor()
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='clients'")
+        result = cursor.fetchone()
+        conn.close()
+        return result is not None
+    except:
+        return False
+
+if not is_db_initialized(DB_PATH):
+    from src.db.init_db import init_database
+    from src.data_generation.generate_seed_data import seed_reference_data
+    init_database()
+    seed_reference_data()
+
 
 # ═══════════════════════════════════════════════════════════════════════
 # PAGE CONFIGURATION — must be the very first Streamlit command
