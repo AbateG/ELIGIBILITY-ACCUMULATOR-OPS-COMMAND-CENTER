@@ -1,0 +1,21 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.4.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.4.0
+    hooks:
+      - id: detect-secrets
+        args: ['--baseline', '.secrets.baseline']
+  - repo: local
+    hooks:
+      - id: pii-scan
+        name: PII Scan
+        entry: bash -c 'echo "Scanning for PII patterns..."; grep -r -i "password\|secret\|key\|token\|[a-z0-9._%+-]\+@[a-z0-9.-]\+\.[a-z]\{2,\}\| \d\{3\}-\d\{2\}-\d\{4\}\|\d\{3}[-.]\d\{3}[-.]\d\{4\}" --exclude-dir=.git --exclude-dir=__pycache__ . && echo "PII scan completed. Review any matches above." || echo "No PII patterns found."'
+        language: system
+        pass_filenames: false
+        files: ^(?!.*(__pycache__|node_modules|\.git)).*$
