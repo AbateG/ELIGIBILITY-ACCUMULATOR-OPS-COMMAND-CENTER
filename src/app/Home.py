@@ -15,18 +15,44 @@ Design principles
 - Accessible: plain-language explanations anyone can follow
 """
 
-# ═══════════════════════════════════════════════════════════════════════
-# IMPORTS
-# ═══════════════════════════════════════════════════════════════════════
-
+# ── Path & DB bootstrap (MUST come before any src.* imports) ───────────
 import sys
+import sqlite3
 from pathlib import Path
 
-# Ensure repo root is on sys.path so `from src.* import ...` works
-_repo_root = Path(__file__).resolve().parents[2]  # src/app/Home.py → ../.. = repo root
-if str(_repo_root) not in sys.path:
-    sys.path.insert(0, str(_repo_root))
+# 1. Add repo root to sys.path
+#    Home.py lives at <repo>/src/app/Home.py → parents[2] = repo root
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
+# 2. Initialize database if tables don't exist
+def _ensure_db():
+    from config.settings import DB_PATH, SCHEMA_PATH
+
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+    conn = sqlite3.connect(str(DB_PATH))
+    try:
+        cur = conn.execute(
+            "SELECT name FROM sqlite_master "
+            "WHERE type='table' AND name='inbound_files'"
+        )
+        if cur.fetchone() is None:
+            if SCHEMA_PATH.exists():
+                conn.executescript(SCHEMA_PATH.read_text())
+                print(f"[startup] Schema applied from {SCHEMA_PATH}")
+
+            seed_path = SCHEMA_PATH.parent / "seed_data.sql"
+            if seed_path.exists():
+                conn.executescript(seed_path.read_text())
+                print(f"[startup] Seed data applied from {seed_path}")
+    finally:
+        conn.close()
+
+_ensure_db()
+
+# ── Original imports continue below ───────────────────────────────────
 import pandas as pd
 import streamlit as st
 import altair as alt
