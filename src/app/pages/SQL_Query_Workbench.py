@@ -506,7 +506,7 @@ WHERE a.individual_oop_accum > a.individual_oop_max
 ORDER BY overage_amount DESC;""",
         "look_for": (
             "Every row here is a problem. High `overage_amount` means the "
-            "member may have been overcharged — they should have hit \$0 "
+            "member may have been overcharged — they should have hit \\$0 "
             "member responsibility after reaching their OOP max. Check for "
             "duplicate claims or incorrect plan limits."
         ),
