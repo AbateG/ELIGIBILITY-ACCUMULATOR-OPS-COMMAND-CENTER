@@ -26,27 +26,105 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-# 2. Initialize database if tables don't exist
+# 2. Initialize database if tables don't exist or schema is outdated
+EXPECTED_SCHEMA_VERSION = 'v2_unified'
+
+
 def _ensure_db():
     from config.settings import DB_PATH, SCHEMA_PATH
 
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
+    needs_init = False
+
+    # ── Check if DB exists and has correct schema version ──
+    if DB_PATH.exists():
+        conn = sqlite3.connect(str(DB_PATH))
+        try:
+            cur = conn.execute(
+                "SELECT schema_version FROM schema_metadata LIMIT 1"
+            )
+            row = cur.fetchone()
+            if row is None or row[0] != EXPECTED_SCHEMA_VERSION:
+                needs_init = True
+                print(
+                    f"[startup] Schema version mismatch: "
+                    f"found={row[0] if row else 'NONE'}, "
+                    f"expected={EXPECTED_SCHEMA_VERSION}"
+                )
+        except sqlite3.OperationalError:
+            # schema_metadata table doesn't exist → old/corrupt DB
+            needs_init = True
+            print("[startup] schema_metadata table missing — reinitializing")
+        finally:
+            conn.close()
+
+        # Remove the stale database so we can recreate it cleanly
+        if needs_init:
+            DB_PATH.unlink()
+            print(f"[startup] Removed stale DB at {DB_PATH}")
+    else:
+        needs_init = True
+        print(f"[startup] No DB found at {DB_PATH} — will create")
+
+    # ── Create fresh database if needed ──
+    if needs_init:
+        conn = sqlite3.connect(str(DB_PATH))
+        try:
+            # Enable foreign keys
+            conn.execute("PRAGMA foreign_keys = ON")
+
+            # Apply schema
+            if SCHEMA_PATH.exists():
+                schema_sql = SCHEMA_PATH.read_text(encoding="utf-8")
+                conn.executescript(schema_sql)
+                print(f"[startup] Schema applied from {SCHEMA_PATH}")
+            else:
+                print(f"[startup] ERROR: Schema file not found at {SCHEMA_PATH}")
+                return
+
+            # Apply seed data
+            seed_path = SCHEMA_PATH.parent / "seed_data.sql"
+            if seed_path.exists():
+                seed_sql = seed_path.read_text(encoding="utf-8")
+                conn.executescript(seed_sql)
+                print(f"[startup] Seed data applied from {seed_path}")
+            else:
+                print(f"[startup] WARNING: No seed file at {seed_path}")
+
+            conn.commit()
+            print("[startup] Database initialization complete")
+
+        except sqlite3.Error as exc:
+            print(f"[startup] ERROR during DB init: {exc}")
+            # Remove partial DB so next restart retries
+            conn.close()
+            if DB_PATH.exists():
+                DB_PATH.unlink()
+            raise
+        finally:
+            conn.close()
+
+    # ── Verify core tables exist ──
     conn = sqlite3.connect(str(DB_PATH))
     try:
         cur = conn.execute(
-            "SELECT name FROM sqlite_master "
-            "WHERE type='table' AND name='inbound_files'"
+            "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
         )
-        if cur.fetchone() is None:
-            if SCHEMA_PATH.exists():
-                conn.executescript(SCHEMA_PATH.read_text())
-                print(f"[startup] Schema applied from {SCHEMA_PATH}")
+        tables = [row[0] for row in cur.fetchall()]
+        print(f"[startup] DB tables ({len(tables)}): {tables}")
 
-            seed_path = SCHEMA_PATH.parent / "seed_data.sql"
-            if seed_path.exists():
-                conn.executescript(seed_path.read_text())
-                print(f"[startup] Seed data applied from {seed_path}")
+        required_tables = [
+            'clients', 'vendors', 'members', 'benefit_plans',
+            'inbound_files', 'claims', 'accumulator_snapshots',
+            'data_quality_issues', 'support_cases', 'processing_runs',
+            'sla_tracking', 'eligibility_periods', 'accumulator_transactions',
+        ]
+        missing = [t for t in required_tables if t not in tables]
+        if missing:
+            print(f"[startup] WARNING: Missing tables: {missing}")
+        else:
+            print("[startup] All required tables verified ✓")
     finally:
         conn.close()
 

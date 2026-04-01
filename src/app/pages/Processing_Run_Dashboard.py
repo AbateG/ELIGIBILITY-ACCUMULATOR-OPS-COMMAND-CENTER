@@ -19,6 +19,16 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
+
+def safe_int(value, default=0):
+    """Return int value, falling back to default if None."""
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        return default
+
 import streamlit as st
 import pandas as pd
 import altair as alt
@@ -306,7 +316,7 @@ with col2:
 with col3:
     st.metric(
         "Rows Processed",
-        f"{summary.get('total_rows_read', 0):,}",
+        f"{safe_int(summary.get('total_rows_read')):,}",
         help="Total number of data rows processed"
     )
 
