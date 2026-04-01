@@ -1,9 +1,8 @@
 import sys
-import os
-# Add project root to path for module imports
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
+from pathlib import Path
+_root = Path(__file__).resolve().parents[3]  # src/app/pages/X.py → 3 levels up = repo root
+if str(_root) not in sys.path:
+    sys.path.insert(0, str(_root))
 
 import pandas as pd
 import streamlit as st
