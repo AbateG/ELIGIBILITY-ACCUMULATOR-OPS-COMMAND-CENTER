@@ -1,33 +1,14 @@
-"""
-Home Page — Eligibility & Accumulator Operations Command Center
-================================================================
-The landing page and operational dashboard for the entire simulator.
-Provides system-wide health metrics, active alert summaries, navigation
-to investigation pages, scenario status, and a plain-English introduction
-to the project — the first thing a reviewer or demo audience sees.
-
-Design principles
------------------
-- First impression: clean, professional, immediately informative
-- Exception-first: surface problems in the key findings banner
-- Navigation hub: guide users to the right investigation page
-- Portfolio-grade: screenshot-ready from the moment the page loads
-- Accessible: plain-language explanations anyone can follow
-"""
-
 # ── Path & DB bootstrap (MUST come before any src.* imports) ───────────
 import sys
 import sqlite3
-from pathlib import Path
+from pathlib import Path as _BootPath
 
 # 1. Add repo root to sys.path
-#    Home.py lives at <repo>/src/app/Home.py → parents[2] = repo root
-_REPO_ROOT = Path(__file__).resolve().parents[2]
+_REPO_ROOT = _BootPath(__file__).resolve().parents[2]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-# 2. Initialize database if tables don't exist or schema is outdated
-EXPECTED_SCHEMA_VERSION = 'v2_unified'
+EXPECTED_SCHEMA_VERSION = "v2_unified"
 
 
 def _ensure_db():
@@ -37,7 +18,6 @@ def _ensure_db():
 
     needs_init = False
 
-    # ── Check if DB exists and has correct schema version ──
     if DB_PATH.exists():
         conn = sqlite3.connect(str(DB_PATH))
         try:
@@ -53,13 +33,11 @@ def _ensure_db():
                     f"expected={EXPECTED_SCHEMA_VERSION}"
                 )
         except sqlite3.OperationalError:
-            # schema_metadata table doesn't exist → old/corrupt DB
             needs_init = True
             print("[startup] schema_metadata table missing — reinitializing")
         finally:
             conn.close()
 
-        # Remove the stale database so we can recreate it cleanly
         if needs_init:
             DB_PATH.unlink()
             print(f"[startup] Removed stale DB at {DB_PATH}")
@@ -67,37 +45,29 @@ def _ensure_db():
         needs_init = True
         print(f"[startup] No DB found at {DB_PATH} — will create")
 
-    # ── Create fresh database if needed ──
     if needs_init:
         conn = sqlite3.connect(str(DB_PATH))
         try:
-            # Enable foreign keys
             conn.execute("PRAGMA foreign_keys = ON")
 
-            # Apply schema
             if SCHEMA_PATH.exists():
-                schema_sql = SCHEMA_PATH.read_text(encoding="utf-8")
-                conn.executescript(schema_sql)
+                conn.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
                 print(f"[startup] Schema applied from {SCHEMA_PATH}")
             else:
-                print(f"[startup] ERROR: Schema file not found at {SCHEMA_PATH}")
+                print(f"[startup] ERROR: Schema file not found: {SCHEMA_PATH}")
                 return
 
-            # Apply seed data
             seed_path = SCHEMA_PATH.parent / "seed_data.sql"
             if seed_path.exists():
-                seed_sql = seed_path.read_text(encoding="utf-8")
-                conn.executescript(seed_sql)
+                conn.executescript(seed_path.read_text(encoding="utf-8"))
                 print(f"[startup] Seed data applied from {seed_path}")
             else:
                 print(f"[startup] WARNING: No seed file at {seed_path}")
 
             conn.commit()
             print("[startup] Database initialization complete")
-
         except sqlite3.Error as exc:
-            print(f"[startup] ERROR during DB init: {exc}")
-            # Remove partial DB so next restart retries
+            print(f"[startup] DB init ERROR: {exc}")
             conn.close()
             if DB_PATH.exists():
                 DB_PATH.unlink()
@@ -105,30 +75,48 @@ def _ensure_db():
         finally:
             conn.close()
 
-    # ── Verify core tables exist ──
+    # Verify
     conn = sqlite3.connect(str(DB_PATH))
     try:
         cur = conn.execute(
             "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
         )
-        tables = [row[0] for row in cur.fetchall()]
-        print(f"[startup] DB tables ({len(tables)}): {tables}")
+        tables = [r[0] for r in cur.fetchall()]
+        print(f"[startup] Tables ({len(tables)}): {tables}")
 
-        required_tables = [
-            'clients', 'vendors', 'members', 'benefit_plans',
-            'inbound_files', 'claims', 'accumulator_snapshots',
-            'data_quality_issues', 'support_cases', 'processing_runs',
-            'sla_tracking', 'eligibility_periods', 'accumulator_transactions',
+        required = [
+            "clients", "vendors", "members", "benefit_plans",
+            "inbound_files", "claims", "accumulator_snapshots",
+            "data_quality_issues", "support_cases", "processing_runs",
+            "client_vendor_relationships", "sla_tracking",
         ]
-        missing = [t for t in required_tables if t not in tables]
+        missing = [t for t in required if t not in tables]
         if missing:
-            print(f"[startup] WARNING: Missing tables: {missing}")
+            print(f"[startup] MISSING TABLES: {missing}")
         else:
-            print("[startup] All required tables verified ✓")
+            print("[startup] All required tables present ✓")
+
+        # Verify issue_code column exists
+        cur2 = conn.execute("PRAGMA table_info(data_quality_issues)")
+        cols = [r[1] for r in cur2.fetchall()]
+        print(f"[startup] data_quality_issues columns: {cols}")
+        if "issue_code" not in cols:
+            print("[startup] CRITICAL: issue_code column MISSING!")
+        else:
+            print("[startup] issue_code column present ✓")
     finally:
         conn.close()
 
+
 _ensure_db()
+
+# ── Original imports below ─────────────────────────────────────────────
+import pandas as pd
+from pathlib import Path
+from datetime import datetime
+
+from src.common.db import fetch_all
+from config.settings import DB_PATH
 
 # ── Original imports continue below ───────────────────────────────────
 import pandas as pd
