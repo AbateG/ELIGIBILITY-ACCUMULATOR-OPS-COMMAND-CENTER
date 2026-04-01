@@ -10,6 +10,13 @@ Mirrors what a Jupyter notebook would contain, but rendered interactively
 in Streamlit with live query execution.
 """
 
+import sys
+import os
+# Add project root to path for module imports
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
 import streamlit as st
 import pandas as pd
 import altair as alt
@@ -763,7 +770,7 @@ JOIN family_snapshots fs ON it.family_id = fs.family_id
 ORDER BY ABS(discrepancy) DESC;""",
         look_for=(
             "Any `❌ DISCREPANCY` row needs investigation. Small discrepancies "
-            "under \$0.05 may be rounding artifacts. Large discrepancies suggest "
+            "under \\$0.05 may be rounding artifacts. Large discrepancies suggest "
             "a member was skipped or has a wrong family_id."
         ),
         key_prefix="family_rollup",
