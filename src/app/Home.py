@@ -19,6 +19,14 @@ Design principles
 # IMPORTS
 # ═══════════════════════════════════════════════════════════════════════
 
+import sys
+from pathlib import Path
+
+# Ensure repo root is on sys.path so `from src.* import ...` works
+_repo_root = Path(__file__).resolve().parents[2]  # src/app/Home.py → ../.. = repo root
+if str(_repo_root) not in sys.path:
+    sys.path.insert(0, str(_repo_root))
+
 import pandas as pd
 import streamlit as st
 import altair as alt
@@ -28,24 +36,6 @@ from datetime import datetime
 
 from src.common.db import fetch_all
 from config.settings import DB_PATH
-
-# Initialize database if needed
-def is_db_initialized(db_path):
-    try:
-        conn = sqlite3.connect(str(db_path))
-        cursor = conn.cursor()
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='clients'")
-        result = cursor.fetchone()
-        conn.close()
-        return result is not None
-    except:
-        return False
-
-if not is_db_initialized(DB_PATH):
-    from src.db.init_db import init_database
-    from src.data_generation.generate_seed_data import seed_reference_data
-    init_database()
-    seed_reference_data()
 
 
 # ═══════════════════════════════════════════════════════════════════════

@@ -1,5 +1,13 @@
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+# Ensure repo root is always importable (safety net for sub-pages)
+_repo_root = Path(__file__).resolve().parents[2]  # src/common/db.py → ../../ = repo root
+if str(_repo_root) not in sys.path:
+    sys.path.insert(0, str(_repo_root))
+
 import logging
 import os
 import sqlite3
